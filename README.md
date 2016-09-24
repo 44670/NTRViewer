@@ -7,4 +7,4 @@ SDL2: https://www.libsdl.org/download-2.0.php
 libjpeg-turbo: http://libjpeg-turbo.virtualgl.org/
 
 # License
-GPLv2
+GPLv3
