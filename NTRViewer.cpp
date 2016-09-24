@@ -41,6 +41,8 @@ int lastTime = clock();
 
 int topRequireUpdate = 0;
 int botRequireUpdate = 0;
+SDL_Rect topRect = { 0, 0, 400, 240 };
+SDL_Rect botRect = { 40, 240, 320, 240 };
 int lastFormat = -1;
 
 u8 buf[2000];
@@ -192,16 +194,30 @@ int recoverFrame(int isTop, int addr) {
 	return 0;
 }
 
-DWORD WINAPI socketThreadMain(LPVOID lpParameter)
+bool checkSDLEvent() {
+	SDL_Event e;
+
+	bool quit = false;
+	while (SDL_PollEvent(&e)){
+		if (e.type == SDL_QUIT){
+			quit = true;
+		}
+	}
+	return quit;
+}
+
+int mainLoop()
 {
 
 	int ret;
+#ifdef WIN32
 	WSADATA wsaData;
 	WORD sockVersion = MAKEWORD(2, 2);
 	if (WSAStartup(sockVersion, &wsaData) != 0)
 	{
 		return 0;
 	}
+#endif
 
 	SOCKET serSocket = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
 	if (serSocket == INVALID_SOCKET)
@@ -354,17 +370,36 @@ DWORD WINAPI socketThreadMain(LPVOID lpParameter)
 			drawFrame(isTop, bufAddr);
 		}
 
+	
+		if (topRequireUpdate) {
+			topRequireUpdate = 0;
+			SDL_UpdateTexture(topTexture, NULL, topBuffer, 400 * 3);
+			SDL_RenderCopy(renderer, topTexture, NULL, &topRect);
+			SDL_RenderPresent(renderer);
+			checkSDLEvent();
+		}
+
+		if (botRequireUpdate) {
+			botRequireUpdate = 0;
+			SDL_UpdateTexture(botTexture, NULL, botBuffer, 320 * 3);
+			SDL_RenderCopy(renderer, botTexture, NULL, &botRect);
+			SDL_RenderPresent(renderer);
+			checkSDLEvent();
+
+		}
 		
 
 	}
+#ifdef WIN32
 	closesocket(serSocket);
 	WSACleanup();
+#endif
+
 	return 0;
 }
 
-void mainLoop() {
-	SDL_Rect topRect = { 0, 0, 400, 240 };
-	SDL_Rect botRect = { 40, 240, 320, 240 };
+void startViewer() {
+
 
 	if (layoutMode == 0) {
 		topRect = { 0, 0, (int) (400 * topScaleFactor), (int) (240 * topScaleFactor) };
@@ -373,40 +408,12 @@ void mainLoop() {
 		topRect = { 0, 0, 400 * topScaleFactor, 240 * topScaleFactor };
 		float indent = 400 * topScaleFactor - 320 * botScaleFactor;
 		botRect = { indent / 2, 240*topScaleFactor, 320 * botScaleFactor, 240 * botScaleFactor };
-
 	}
 
-	CreateThread(NULL, 0, socketThreadMain, NULL, 0, NULL);
 
 	SDL_RenderClear(renderer);
 
-	SDL_Event e;
-	bool quit = false;
-	while (!quit){
-		while (SDL_PollEvent(&e)){
-			if (e.type == SDL_QUIT){
-				quit = true;
-			}
-		}
-
-		if (topRequireUpdate) {
-			topRequireUpdate = 0;
-			SDL_UpdateTexture(topTexture, NULL, topBuffer, 400  * 3);
-			SDL_RenderCopy(renderer, topTexture, NULL, &topRect);
-			SDL_RenderPresent(renderer);
-
-		}
-
-		if (botRequireUpdate) {
-			botRequireUpdate = 0;
-			SDL_UpdateTexture(botTexture, NULL, botBuffer, 320 * 3);
-			SDL_RenderCopy(renderer, botTexture, NULL, &botRect);
-			SDL_RenderPresent(renderer);
-
-		}
-		SDL_Delay(10);
-
-	}
+	mainLoop();
 }
 
 
@@ -471,7 +478,7 @@ int main(int argc, char* argv[])
 		320, 240);
 
 
-	mainLoop();
+	startViewer();
 	return 0;
 }
 
