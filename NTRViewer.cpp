@@ -26,13 +26,7 @@ SDL_Texture* botTexture;
 
 tjhandle decompressHandle;
 
-u8* jdecOutputBuf;
-u8* jdecInputBuf;
-u32 jdecRemainOut, jdecRemainIn, jdecWidth, jdecHeight;
-u8 jdecWorkBuffer[8192 * 1024];
-
 u8 recvBuffer[2][2][1444 * 140 * 3];
-
 
 u8 topBuffer[400 * 240 * 3 * 3];
 u8 botBuffer[320 * 240 * 3 * 3];
@@ -53,6 +47,8 @@ u8 buf[2000];
 u8 trackingId[2];
 int newestBuf[2], bufCount[2][2], isFinished[2][2];
 int bufTarget[2][2];
+
+#define BUF_TARGET_UNKNOWN (9999)
 
 int uncompressedTargetCount[2] = {  107 , 133};
 
@@ -112,9 +108,9 @@ void transBuffer(u16* dst, u16* src, int width, int height, int format) {
 }
 
 void convertBuffer(u8* dst, u8* src, int width, int height, int format) {
-	u32 x, y;
+	int x, y;
 	u8 *dp, *sp;
-	u32 bytesPerRow = width * 3;
+	int bytesPerRow = width * 3;
 	dp = dst;
 	sp = src;
 
@@ -148,7 +144,7 @@ void advanceBuffer(u8 isTop) {
 	newestBuf[isTop] = !newestBuf[isTop];
 	bufCount[isTop][newestBuf[isTop]] = 0;
 	isFinished[isTop][newestBuf[isTop]] = 0;
-	bufTarget[isTop][newestBuf[isTop]] = 9999;//isTop ? 9999 : uncompressedTargetCount[isTop];
+	bufTarget[isTop][newestBuf[isTop]] = BUF_TARGET_UNKNOWN;
 
 
 }
@@ -159,46 +155,13 @@ void resetBuffer(u8 isTop) {
 	bufCount[isTop][1] = 0;
 	isFinished[isTop][0] = 0;
 	isFinished[isTop][1] = 0;
-	bufTarget[isTop][0] = 9999; //isTop ? 9999 : uncompressedTargetCount[isTop];
-	bufTarget[isTop][1] = 9999; // isTop ? 9999 : uncompressedTargetCount[isTop];
+	bufTarget[isTop][0] = BUF_TARGET_UNKNOWN;
+	bufTarget[isTop][1] = BUF_TARGET_UNKNOWN;
 	totalCount += 2;
 	badCount += 2;
 	logV("** reset buffer, 2 bad frames dropped\n");
 }
 
-
-/*
-u32 jdecInFunc(JDEC* jdec, BYTE* buff, UINT ndata) {
-	u32 dataRead = ndata;
-	if (dataRead > jdecRemainIn) {
-		dataRead = jdecRemainIn;
-	}
-	if (buff) {
-		memcpy(buff, jdecInputBuf, dataRead);
-	}
-
-	jdecInputBuf += dataRead;
-	jdecRemainIn -= dataRead;
-	return dataRead;
-}
-
-u32 jdecOutFunc(JDEC* jdec, void* buff, JRECT* rect) {
-	u8* sp = (u8*) buff;
-
-	for (int i = rect->top; i <= rect->bottom; i++) {
-		for (int j = rect->left; j <= rect->right; j++) {
-			//printf("offset: %d\n", (i * jdecWidth + j) * 3);
-			u8* dp = jdecOutputBuf + (240 * i + j) * 3 ;
-			dp[0] = sp[0];
-			dp[1] = sp[1];
-			dp[2] = sp[2];
-			sp += 3;
-		}
-	}
-	
-	return 1;
-}
-*/
 
 void uncompressJpeg(u8* src, u8* dst, u32 srcSize, u32 dstSize, u32 width, u32 height) {
 	tjDecompress2(decompressHandle, src, srcSize, dst, width, 3 * width, height, TJPF_RGB, 0);
@@ -227,19 +190,6 @@ void drawFrame(int isTop, int addr) {
 int recoverFrame(int isTop, int addr) {
 	// never recover any frame
 	return 0;
-
-	if (isTop) {
-		// never recover a compressed frame
-		return 0;
-	}
-	int loss = bufTarget[isTop][addr] - bufCount[isTop][addr];
-	if (loss <= 10) {
-		recoverCount += 1;
-		logV("recovered one frame, usTop: %d, loss: %d\n",isTop,  loss);
-		drawFrame(isTop, addr);
-		return 1;
-	}
-	return 0;
 }
 
 DWORD WINAPI socketThreadMain(LPVOID lpParameter)
@@ -256,7 +206,7 @@ DWORD WINAPI socketThreadMain(LPVOID lpParameter)
 	SOCKET serSocket = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
 	if (serSocket == INVALID_SOCKET)
 	{
-		printf("socket error !");
+		logI("socket error !");
 		return 0;
 	}
 
@@ -266,7 +216,7 @@ DWORD WINAPI socketThreadMain(LPVOID lpParameter)
 	serAddr.sin_addr.S_un.S_addr = INADDR_ANY;
 	if (bind(serSocket, (sockaddr *)&serAddr, sizeof(serAddr)) == SOCKET_ERROR)
 	{
-		printf("bind error !");
+		logI("bind error !");
 		closesocket(serSocket);
 		return 0;
 	}
@@ -282,9 +232,9 @@ DWORD WINAPI socketThreadMain(LPVOID lpParameter)
 	ret = setsockopt(serSocket, SOL_SOCKET, SO_RCVBUF, (char*)(&buff_size), sizeof(buff_size));
 	buff_size = 0;
 	ret = getsockopt(serSocket, SOL_SOCKET, SO_RCVBUF, (char*)(&buff_size), &tmp);
-	printf("set buff size: %d\n", buff_size);
+	logI("set buff size: %d\n", buff_size);
 	if (ret) {
-		printf("set buff size failed, ret: %d\n", ret);
+		logI("set buff size failed, ret: %d\n", ret);
 		return 0;
 	}
 
@@ -389,12 +339,12 @@ DWORD WINAPI socketThreadMain(LPVOID lpParameter)
 		if (bufCount[isTop][bufAddr] >= bufTarget[isTop][bufAddr]) {
 			if (bufCount[isTop][bufAddr] > bufTarget[isTop][bufAddr]) {
 				// we have receive same packet multiple times?
-				printf("wow\n");
+				logI("wow\n");
 			}
 			isFinished[isTop][bufAddr] = 1;
 			if ((isFinished[isTop][newestBuf[isTop]]) && (bufAddr != newestBuf[isTop])) {
 				// the newest frame has already finished, do not draw
-				printf("newest frame already finished: %d %d\n", isTop, id);
+				logV("newest frame already finished: %d %d\n", isTop, id);
 			}
 			
 			logV("good frame: %d %d\n", isTop, id);
@@ -417,10 +367,9 @@ void mainLoop() {
 	SDL_Rect botRect = { 40, 240, 320, 240 };
 
 	if (layoutMode == 0) {
-		topRect = { 0, 0, 400 * topScaleFactor, 240 * topScaleFactor };
-		botRect = { 400 * topScaleFactor, screenHeight - 240 * botScaleFactor, 320 * botScaleFactor, 240 * botScaleFactor };
-	}
-	else {
+		topRect = { 0, 0, (int) (400 * topScaleFactor), (int) (240 * topScaleFactor) };
+		botRect = { (int) (400 * topScaleFactor), (int) (screenHeight - 240 * botScaleFactor), (int) (320 * botScaleFactor), (int) (240 * botScaleFactor) };
+	} else {
 		topRect = { 0, 0, 400 * topScaleFactor, 240 * topScaleFactor };
 		float indent = 400 * topScaleFactor - 320 * botScaleFactor;
 		botRect = { indent / 2, 240*topScaleFactor, 320 * botScaleFactor, 240 * botScaleFactor };
@@ -439,6 +388,7 @@ void mainLoop() {
 				quit = true;
 			}
 		}
+
 		if (topRequireUpdate) {
 			topRequireUpdate = 0;
 			SDL_UpdateTexture(topTexture, NULL, topBuffer, 400  * 3);
@@ -469,10 +419,10 @@ void parseOpts(int argc, char* argv[]) {
 			layoutMode = atoi(optarg);
 			break;
 		case 't':
-			topScaleFactor = atof(optarg);
+			topScaleFactor = (float) atof(optarg);
 			break;
 		case 'b':
-			botScaleFactor = atof(optarg);
+			botScaleFactor = (float) atof(optarg);
 			break;
 		default:
 			break;
@@ -496,16 +446,16 @@ int main(int argc, char* argv[])
 	}
 
 	if (layoutMode == 0) {
-		screenWidth = 400 * topScaleFactor + 320 * botScaleFactor;
-		screenHeight = 240 * topScaleFactor;
+		screenWidth = (int) (400 * topScaleFactor + 320 * botScaleFactor);
+		screenHeight = (int) (240 * topScaleFactor);
 	}
 	else {
-		screenWidth = 400 * topScaleFactor ;
-		screenHeight = 240 * topScaleFactor + 240 * botScaleFactor;
+		screenWidth = (int) (400 * topScaleFactor) ;
+		screenHeight = (int) (240 * topScaleFactor + 240 * botScaleFactor);
 	}
 	mainWindow = SDL_CreateWindow("NTRViewer", 100, 100, screenWidth, screenHeight, SDL_WINDOW_SHOWN);
 	renderer = SDL_CreateRenderer(mainWindow, -1, SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC);
-	//SDL_RenderSetScale(renderer, topScaleFactor, topScaleFactor);
+
 	if (!renderer) {
 		return 0;
 	}
