@@ -52,12 +52,12 @@
       </PrecompiledHeader>
       <WarningLevel>Level3</WarningLevel>
       <PreprocessorDefinitions>WIN32;_DEBUG;_CONSOLE;_LIB;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-      <AdditionalIncludeDirectories>SDL2\include;zlib-1.2.8;jpeg;</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>SDL\include;zlib-1.2.8;jpeg;ffmpeg\include</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>SDL2\lib\x86\SDL2.lib;jpeg\turbojpeg.lib</AdditionalDependencies>
+      <AdditionalDependencies>SDL\lib\x86\SDL.lib;jpeg\turbojpeg.lib;ffmpeg\lib\swscale.lib</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
