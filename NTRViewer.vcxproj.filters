@@ -21,9 +21,6 @@
     <Text Include="ReadMe.txt" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="stdafx.h">
-      <Filter>头文件</Filter>
-    </ClInclude>
     <ClInclude Include="targetver.h">
       <Filter>头文件</Filter>
     </ClInclude>
@@ -45,15 +42,15 @@
     <ClInclude Include="jpeg\jerror.h">
       <Filter>jpeg</Filter>
     </ClInclude>
+    <ClInclude Include="intdef.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="stdafx.cpp">
+    <ClCompile Include="getopt.c">
       <Filter>源文件</Filter>
     </ClCompile>
     <ClCompile Include="NTRViewer.cpp">
-      <Filter>源文件</Filter>
-    </ClCompile>
-    <ClCompile Include="getopt.c">
       <Filter>源文件</Filter>
     </ClCompile>
   </ItemGroup>
