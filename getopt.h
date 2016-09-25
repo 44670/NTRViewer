@@ -36,6 +36,13 @@ extern "C"
 {
 #endif
 
+#define getopt NTR_getopt
+#define optarg NTR_optarg
+#define opterr NTR_opterr
+#define optind NTR_optind
+#define optopt NTR_optopt
+#define optreset NTR_optreset
+
 extern int     opterr;
 extern int     optind;
 extern int     optopt;

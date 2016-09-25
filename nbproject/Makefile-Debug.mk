@@ -35,15 +35,16 @@ OBJECTDIR=${CND_BUILDDIR}/${CND_CONF}/${CND_PLATFORM}
 
 # Object Files
 OBJECTFILES= \
-	${OBJECTDIR}/NTRViewer.o
+	${OBJECTDIR}/NTRViewer.o \
+	${OBJECTDIR}/getopt.o
 
 
 # C Compiler Flags
 CFLAGS=
 
 # CC Compiler Flags
-CCFLAGS=
-CXXFLAGS=
+CCFLAGS=-std=c++0x
+CXXFLAGS=-std=c++0x
 
 # Fortran Compiler Flags
 FFLAGS=
@@ -52,7 +53,7 @@ FFLAGS=
 ASFLAGS=
 
 # Link Libraries and Options
-LDLIBSOPTIONS=-lturbojpeg
+LDLIBSOPTIONS=-lturbojpeg -lSDL -lswscale
 
 # Build Targets
 .build-conf: ${BUILD_SUBPROJECTS}
@@ -60,12 +61,17 @@ LDLIBSOPTIONS=-lturbojpeg
 
 ${CND_DISTDIR}/${CND_CONF}/${CND_PLATFORM}/ntrviewer: ${OBJECTFILES}
 	${MKDIR} -p ${CND_DISTDIR}/${CND_CONF}/${CND_PLATFORM}
-	${LINK.cc} -o ${CND_DISTDIR}/${CND_CONF}/${CND_PLATFORM}/ntrviewer ${OBJECTFILES} ${LDLIBSOPTIONS} -lSDL2
+	${LINK.cc} -o ${CND_DISTDIR}/${CND_CONF}/${CND_PLATFORM}/ntrviewer ${OBJECTFILES} ${LDLIBSOPTIONS}
 
 ${OBJECTDIR}/NTRViewer.o: NTRViewer.cpp 
 	${MKDIR} -p ${OBJECTDIR}
 	${RM} "$@.d"
-	$(COMPILE.cc) -g -std=c++11 -MMD -MP -MF "$@.d" -o ${OBJECTDIR}/NTRViewer.o NTRViewer.cpp
+	$(COMPILE.cc) -g -MMD -MP -MF "$@.d" -o ${OBJECTDIR}/NTRViewer.o NTRViewer.cpp
+
+${OBJECTDIR}/getopt.o: getopt.c 
+	${MKDIR} -p ${OBJECTDIR}
+	${RM} "$@.d"
+	$(COMPILE.c) -g -MMD -MP -MF "$@.d" -o ${OBJECTDIR}/getopt.o getopt.c
 
 # Subprojects
 .build-subprojects:
