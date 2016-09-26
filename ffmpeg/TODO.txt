@@ -1,3 +1,0 @@
-https://ffmpeg.zeranoe.com/builds/
-
-Download FFmpeg 32-bit Dev Versions and extract to this directory.
