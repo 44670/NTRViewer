@@ -29,4 +29,4 @@ make CONF=Release
 
 Windows:
 
-Build this project with Visual Studio 2013.
+Follow the guide in ffmpeg directory, then build this project with Visual Studio 2013.
