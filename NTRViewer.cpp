@@ -738,7 +738,7 @@ void parseOpts(int argc, char* argv[]) {
             case 'f':
                 fullScreenMode = 1;
                 break;
-            case 'c':s
+            case 'c':
                 hideCursor = 1;
                 break;
 			case 'w':
