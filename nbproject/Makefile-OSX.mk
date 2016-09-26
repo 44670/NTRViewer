@@ -23,7 +23,7 @@ AS=as
 # Macros
 CND_PLATFORM=GNU-MacOSX
 CND_DLIB_EXT=dylib
-CND_CONF=Release
+CND_CONF=OSX
 CND_DISTDIR=dist
 CND_BUILDDIR=build
 
@@ -53,7 +53,7 @@ FFLAGS=
 ASFLAGS=
 
 # Link Libraries and Options
-LDLIBSOPTIONS=-lSDL -lswscale -lturbojpeg
+LDLIBSOPTIONS=-lSDL -lswscale
 
 # Build Targets
 .build-conf: ${BUILD_SUBPROJECTS}
@@ -61,12 +61,12 @@ LDLIBSOPTIONS=-lSDL -lswscale -lturbojpeg
 
 ${CND_DISTDIR}/${CND_CONF}/${CND_PLATFORM}/ntrviewer: ${OBJECTFILES}
 	${MKDIR} -p ${CND_DISTDIR}/${CND_CONF}/${CND_PLATFORM}
-	${LINK.cc} -o ${CND_DISTDIR}/${CND_CONF}/${CND_PLATFORM}/ntrviewer ${OBJECTFILES} ${LDLIBSOPTIONS}
+	${LINK.cc} -o ${CND_DISTDIR}/${CND_CONF}/${CND_PLATFORM}/ntrviewer ${OBJECTFILES} ${LDLIBSOPTIONS} /usr/local/opt/jpeg-turbo/lib/libturbojpeg.a
 
 ${OBJECTDIR}/NTRViewer.o: NTRViewer.cpp 
 	${MKDIR} -p ${OBJECTDIR}
 	${RM} "$@.d"
-	$(COMPILE.cc) -O2 -MMD -MP -MF "$@.d" -o ${OBJECTDIR}/NTRViewer.o NTRViewer.cpp
+	$(COMPILE.cc) -O2 -I/usr/local/opt/jpeg-turbo/include -MMD -MP -MF "$@.d" -o ${OBJECTDIR}/NTRViewer.o NTRViewer.cpp
 
 ${OBJECTDIR}/getopt.o: getopt.c 
 	${MKDIR} -p ${OBJECTDIR}

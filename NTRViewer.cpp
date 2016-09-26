@@ -17,12 +17,18 @@ extern "C" {
 #include <libavutil/pixfmt.h>
 }
 
+#ifdef AV_PIX_FMT_RGB32
+#define XXX_PIX_FMT_RGB24 (AV_PIX_FMT_RGB32)
+#else
+#define XXX_PIX_FMT_RGB24 (PIX_FMT_RGB32)
+#endif 
+
 
 #ifdef WIN32
 #pragma comment(lib,"ws2_32.lib")  
 #include <winsock2.h>
 #include <SDL.h>
-#define PIX_FMT_RGB24 AV_PIX_FMT_RGB24
+
 typedef int socklen_t;
 
 #else
@@ -526,7 +532,7 @@ void initScreenInfo(int isTop, int w, int h, float scale) {
 	}
 	scr->needDraw = true;
 	if (scr->rawWidth != scr->srcRect.w) {
-		scr->swsContext = sws_getContext(scr->rawWidth, scr->rawHeight, PIX_FMT_RGB24, scr->srcRect.w, scr->srcRect.h, PIX_FMT_RGB24, 
+		scr->swsContext = sws_getContext(scr->rawWidth, scr->rawHeight, XXX_PIX_FMT_RGB24, scr->srcRect.w, scr->srcRect.h, XXX_PIX_FMT_RGB24, 
 			swsFlag, NULL, NULL, NULL);
 	}
 
