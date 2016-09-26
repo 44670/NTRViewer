@@ -10,7 +10,9 @@
 #define INT64_C(c) (c ## LL)
 #define UINT64_C(c) (c ## ULL)
 #endif
+
 extern "C" {
+    
 #include <libswscale/swscale.h>
 #include <libavutil/opt.h>
 #include <libavutil/imgutils.h>

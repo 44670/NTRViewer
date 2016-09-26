@@ -21,8 +21,8 @@ FC=gfortran
 AS=as
 
 # Macros
-CND_PLATFORM=GNU-MacOSX
-CND_DLIB_EXT=dylib
+CND_PLATFORM=GNU-Linux
+CND_DLIB_EXT=so
 CND_CONF=Release
 CND_DISTDIR=dist
 CND_BUILDDIR=build
@@ -66,7 +66,7 @@ ${CND_DISTDIR}/${CND_CONF}/${CND_PLATFORM}/ntrviewer: ${OBJECTFILES}
 ${OBJECTDIR}/NTRViewer.o: NTRViewer.cpp 
 	${MKDIR} -p ${OBJECTDIR}
 	${RM} "$@.d"
-	$(COMPILE.cc) -O2 -MMD -MP -MF "$@.d" -o ${OBJECTDIR}/NTRViewer.o NTRViewer.cpp
+	$(COMPILE.cc) -O3 -MMD -MP -MF "$@.d" -o ${OBJECTDIR}/NTRViewer.o NTRViewer.cpp
 
 ${OBJECTDIR}/getopt.o: getopt.c 
 	${MKDIR} -p ${OBJECTDIR}
