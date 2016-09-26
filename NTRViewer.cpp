@@ -2,7 +2,7 @@
 
 #include <stdio.h>
 #include <time.h>
-
+#include <string.h>
 #include <turbojpeg.h>
 
 #include "intdef.h"
@@ -45,17 +45,23 @@ typedef int socklen_t;
 
 float topScaleFactor = 1;
 float botScaleFactor = 1;
-int screenWidth;
-int screenHeight;
 int layoutMode = 1;
 int logLevel = 1;
 
-struct SwsContext *topSwsContext, *botSwsContext;
+
+typedef struct _NTR_SCREEN {
+	SDL_Surface* surface;
+	u8* decompressBuffer;//[400 * 240 * 3 * 3];
+	u8* rotateBuffer;//[400 * 240 * 3 * 3];
+	SDL_Rect srcRect, dstRect;
+	int requireUpdate;
+	SwsContext* swsContext;
+	bool needDraw;
+	int rawWidth, rawHeight;
+	float scale;
+} NTR_SCREEN;
 
 
-
-SDL_Surface* topSurface;
-SDL_Surface* botSurface;
 SDL_Surface* screenSurface;
 
 
@@ -63,9 +69,6 @@ tjhandle decompressHandle;
 
 u8 recvBuffer[2][2][1444 * 140 * 3];
 
-u8 topBuffer[400 * 240 * 3 * 3];
-u8 botBuffer[320 * 240 * 3 * 3];
-u8 decompressBuffer[2][400 * 240 * 3 * 3];
 
 int totalCount = 0;
 int badCount = 0;
@@ -73,13 +76,6 @@ int recoverCount = 0;
 float totalCompressRatio = 0;
 int compressCount = 0;
 int lastTime = clock();
-
-int topRequireUpdate = 0;
-int botRequireUpdate = 0;
-SDL_Rect topDrawRect = {0,0,400,240};
-SDL_Rect botDrawRect = {0,0,320,240};
-SDL_Rect topRect = {0, 0, 400, 240};
-SDL_Rect botRect = {40, 240, 320, 240};
 int lastFormat = -1;
 
 u8 buf[2000];
@@ -87,23 +83,26 @@ u8 trackingId[2];
 int newestBuf[2], bufCount[2][2], isFinished[2][2];
 int bufTarget[2][2];
 
+NTR_SCREEN screenInfo[2];
+
 #define BUF_TARGET_UNKNOWN (9999)
 
 int uncompressedTargetCount[2] = {107, 133};
-
 char activateStreamingHost[256];
 
 
 int fullScreenMode = 0;
 int hideCursor = 0;
+int screenWidth = 0, screenHeight = 0;
 
 int priorityMode = 0;
 int priorityFactor = 5;
 int jpegQuality = 80;
 float qosValue = 30.0;
 
+int swsFlag = SWS_FAST_BILINEAR;
 
-SOCKET serSocket;
+SOCKET udpSocket;
 
 void printTime() {
     time_t rawtime;
@@ -234,52 +233,31 @@ void drawFrame(int isTop, int addr) {
     u8* dst_data[4] = {0,0,0,0};
     int src_linesize[4] = {0,0,0,0};
     int dst_linesize[4] = {0,0,0,0};
-    if (isTop) {
-        
-        if (topRect.w < 10) {
+	NTR_SCREEN* scr = &(screenInfo[isTop]);
+
+
+        if (scr->needDraw == false) {
             return;
         }
         compressCount += 1;
         totalCompressRatio += ((float) bufTarget[isTop][addr]) / uncompressedTargetCount[isTop];
-        uncompressJpeg(recvBuffer[isTop][addr], decompressBuffer[1], (PACKET_SIZE - 4) * bufTarget[isTop][addr], 400 * 240 * 3, 240, 400);
-        SDL_LockSurface(topSurface);
+        uncompressJpeg(recvBuffer[isTop][addr], scr->decompressBuffer, (PACKET_SIZE - 4) * bufTarget[isTop][addr], scr->rawWidth * scr->rawHeight * 3, 
+			scr->rawHeight, scr->rawWidth);
+        SDL_LockSurface(scr->surface);
         
-        if (topSwsContext) {
-            src_data[0] = topBuffer;
-            dst_data[0] = (u8*) (topSurface->pixels);
-            src_linesize[0] = 400 * 3;
-            dst_linesize[0] = (topRect.w) * 3;
-            convertBuffer((u8*) (topBuffer), decompressBuffer[1], 400, 240, lastFormat);
-            sws_scale(topSwsContext,  src_data,src_linesize, 0, 240, dst_data,dst_linesize );
+        if (scr->swsContext) {
+            src_data[0] = scr->rotateBuffer;
+            dst_data[0] = (u8*) (scr->surface->pixels);
+            src_linesize[0] = scr->rawWidth * 3;
+            dst_linesize[0] = (scr->srcRect.w) * 3;
+            convertBuffer((u8*) (scr->rotateBuffer), scr->decompressBuffer, scr->rawWidth, scr->rawHeight, lastFormat);
+            sws_scale(scr->swsContext,  src_data,src_linesize, 0, scr->rawHeight, dst_data,dst_linesize );
         } else {
-            convertBuffer((u8*) (topSurface->pixels), decompressBuffer[1], 400, 240, lastFormat);
+			convertBuffer((u8*)(scr->surface->pixels), scr->decompressBuffer, scr->rawWidth, scr->rawHeight, lastFormat);
         }
 
-        SDL_UnlockSurface(topSurface);
-        topRequireUpdate = 1;
-    } else {
-        if (botRect.w < 10) {
-            return;
-        }
-        compressCount += 1;
-        totalCompressRatio += ((float) bufTarget[isTop][addr]) / uncompressedTargetCount[isTop];
-        uncompressJpeg(recvBuffer[isTop][addr], decompressBuffer[0], (PACKET_SIZE - 4) * bufTarget[isTop][addr], 400 * 240 * 3, 240, 320);
-        SDL_LockSurface(botSurface);
-        if (botSwsContext) {
-            src_data[0] = botBuffer;
-            dst_data[0] = (u8*) (botSurface->pixels);
-            
-            src_linesize[0] = 320 * 3;
-            dst_linesize[0] = (botRect.w) * 3;
-            convertBuffer((u8*) (botBuffer), decompressBuffer[0], 320, 240, lastFormat);
-            sws_scale(botSwsContext,  src_data,src_linesize, 0, 240, dst_data,dst_linesize );
-        } else {
-            convertBuffer((u8*) (botSurface->pixels), decompressBuffer[0], 320, 240, lastFormat);
-        }
-
-        SDL_UnlockSurface(botSurface);
-        botRequireUpdate = 1;
-    }
+        SDL_UnlockSurface(scr->surface);
+        scr->requireUpdate = 1;
 }
 
 int recoverFrame(int isTop, int addr) {
@@ -303,7 +281,7 @@ int recvAndHandlePacket() {
     sockaddr_in remoteAddr;
     socklen_t nAddrLen = sizeof (remoteAddr);
 
-    int ret = recvfrom(serSocket, (char*) buf, 2000, 0, (sockaddr *) & remoteAddr, &nAddrLen);
+    int ret = recvfrom(udpSocket, (char*) buf, 2000, 0, (sockaddr *) & remoteAddr, &nAddrLen);
     if (ret <= 0) {
         return 2;
     }
@@ -397,8 +375,8 @@ int mainLoop() {
     int ret;
 
 
-    serSocket = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
-    if (serSocket == INVALID_SOCKET) {
+    udpSocket = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
+    if (udpSocket == INVALID_SOCKET) {
         printf("socket error !");
         return 0;
     }
@@ -407,20 +385,19 @@ int mainLoop() {
     serAddr.sin_family = AF_INET;
     serAddr.sin_port = htons(8001);
     serAddr.sin_addr.s_addr = htonl(INADDR_ANY);
-    if (bind(serSocket, (sockaddr *) & serAddr, sizeof (serAddr)) == SOCKET_ERROR) {
+    if (bind(udpSocket, (sockaddr *) & serAddr, sizeof (serAddr)) == SOCKET_ERROR) {
         printf("bind error !");
         return 0;
     }
-
 
     int lastRecvCount = 0;
 
     int buff_size = 8 * 1024 * 1024;
     socklen_t tmp = 4;
 
-    ret = setsockopt(serSocket, SOL_SOCKET, SO_RCVBUF, (char*) (&buff_size), sizeof (buff_size));
+    ret = setsockopt(udpSocket, SOL_SOCKET, SO_RCVBUF, (char*) (&buff_size), sizeof (buff_size));
     buff_size = 0;
-    ret = getsockopt(serSocket, SOL_SOCKET, SO_RCVBUF, (char*) (&buff_size), &tmp);
+    ret = getsockopt(udpSocket, SOL_SOCKET, SO_RCVBUF, (char*) (&buff_size), &tmp);
     logI("set buff size: %d\n", buff_size);
     if (ret) {
         printf("set buff size failed, ret: %d\n", ret);
@@ -430,13 +407,12 @@ int mainLoop() {
     timeout.tv_sec = 1;
     timeout.tv_usec = 0;
 
-    ret = setsockopt(serSocket, SOL_SOCKET, SO_RCVTIMEO, (char *) &timeout,
+    ret = setsockopt(udpSocket, SOL_SOCKET, SO_RCVTIMEO, (char *) &timeout,
             sizeof (timeout));
         if (ret) {
         printf("set recv timeout failed, ret: %d\n", ret);
         return 0;
     }
-
 
     resetBuffer(0);
     resetBuffer(1);
@@ -467,40 +443,38 @@ int mainLoop() {
             SDL_WM_SetCaption( buf, NULL);
         }
 
-        bool requireCheckEvent = false;
+        bool requireUpdateAndCheckEvent = false;
         ret = recvAndHandlePacket();
         if (ret == 2) {
             logI("recv failed or timeout.\n");
-            requireCheckEvent = true;
-        }
-        SDL_Rect destRect;
-        
-        if (topRequireUpdate) {
-            topRequireUpdate = 0;
-            destRect = topRect;
-            SDL_BlitSurface(topSurface, &topDrawRect , screenSurface, &destRect);
-   
-            requireCheckEvent = true;
-        }
-        if (botRequireUpdate) {
-            botRequireUpdate = 0;
-            destRect = botRect;
-            SDL_BlitSurface(botSurface, NULL, screenSurface, &destRect);
-            requireCheckEvent = true;
+			requireUpdateAndCheckEvent = true;
         }
 
-        if (requireCheckEvent) {
-            
+        SDL_Rect destRect;
+
+		for (int isTop = 0; isTop <= 1; isTop++){
+			NTR_SCREEN* scr = &(screenInfo[isTop]);
+			if (scr->requireUpdate) {
+				scr->requireUpdate = 0;
+				destRect = scr->dstRect;
+				SDL_BlitSurface(scr->surface, &scr->srcRect, screenSurface, &destRect);
+				requireUpdateAndCheckEvent = true;
+			}
+		}
+
+		if (requireUpdateAndCheckEvent) {
             SDL_UpdateRect(screenSurface, 0, 0, 0, 0);
             bool quit = checkSDLEvent();
             if (quit) {
                 SDL_Quit();
-                exit(0);
+				goto final;
             }
         }
 
     }
-	closeSocket(serSocket);
+
+final:
+	closeSocket(udpSocket);
 
     return 0;
 }
@@ -534,9 +508,33 @@ SDL_Rect createRect(int x, int y, int w, int h) {
     return r;
 }
 
+void initScreenInfo(int isTop, int w, int h, float scale) {
+	NTR_SCREEN* scr = &(screenInfo[isTop]);
+
+	scr->rawWidth = w;
+	scr->rawHeight = h;
+
+	scr->srcRect = createRect(0, 0, (w * scale), (h * scale));
+	scr->dstRect = scr->srcRect;
+	
+	scr->rotateBuffer = (u8*) malloc(400 * 240 * 3 * 3);
+	scr->decompressBuffer = (u8*) malloc(400 * 240 * 3 * 3);
+
+	if (scr->srcRect.w < 10) {
+		scr->needDraw = false;
+		return;
+	}
+	scr->needDraw = true;
+	if (scr->rawWidth != scr->srcRect.w) {
+		scr->swsContext = sws_getContext(scr->rawWidth, scr->rawHeight, PIX_FMT_RGB24, scr->srcRect.w, scr->srcRect.h, PIX_FMT_RGB24, 
+			swsFlag, NULL, NULL, NULL);
+	}
+
+}
+
 int startViewer() {
 
-
+	/*
     if (layoutMode == 0) {
         topRect = createRect(0, 0, (int) (400 * topScaleFactor), (int) (240 * topScaleFactor));
         botRect = createRect((int) (400 * topScaleFactor), 0,(int) (320 * botScaleFactor), (int) (240 * botScaleFactor));
@@ -548,6 +546,10 @@ int startViewer() {
     
     topDrawRect = createRect(0,0,topRect.w, topRect.h);
     botDrawRect = createRect(0,0,botRect.w, botRect.h);
+	*/
+
+	initScreenInfo(0, 320, 240, botScaleFactor);
+	initScreenInfo(1, 400, 240, topScaleFactor);
     
     printf("init SDL...\n");
 
@@ -556,39 +558,51 @@ int startViewer() {
     }
     printf("SDL_Init done.\n");
 
-    if (layoutMode == 0) {
-        screenWidth = (int) (400 * topScaleFactor + 320 * botScaleFactor);
-        screenHeight = (int) (240 * topScaleFactor);
-    } else {
-        screenWidth = (int) (400 * topScaleFactor);
-        screenHeight = (int) (240 * topScaleFactor + 240 * botScaleFactor);
-    }
-    if (topRect.w != 400) {
-        topSwsContext = sws_getContext(400, 240,PIX_FMT_RGB24, topRect.w, topRect.h, PIX_FMT_RGB24,  SWS_BICUBIC, NULL, NULL, NULL);
-        logI("Top screen is scaled.\n");
-        
-    }
-    if (botRect.w != 320) {
-        botSwsContext = sws_getContext(300, 240,PIX_FMT_RGB24, botRect.w, botRect.h, PIX_FMT_RGB24,  SWS_BICUBIC, NULL, NULL, NULL);
-        logI("Bottom screen is scaled.\n");
-        
-    }
+	if (layoutMode == 0) {
+		screenInfo[0].dstRect.x = screenInfo[1].dstRect.w;
+	} else {
+		screenInfo[0].dstRect.y = screenInfo[1].dstRect.h;
+	}
+
+	if (screenWidth == 0) {
+		// calc minimum screen size
+		for (int isTop = 0; isTop <= 1; isTop++){
+			int minWidth = screenInfo[isTop].dstRect.w + screenInfo[isTop].dstRect.x;
+			int minHeight = screenInfo[isTop].dstRect.h + screenInfo[isTop].dstRect.y;
+			if (minWidth > screenWidth) {
+				screenWidth = minWidth;
+			}
+			if (minHeight > screenHeight) {
+				screenHeight = minHeight;
+			}
+		}
+	}
+
+    if (layoutMode == 1) {
+		for (int isTop = 0; isTop <= 1; isTop++){
+			int indent = (screenWidth - screenInfo[isTop].dstRect.w) / 2;
+			if (indent > 0) {
+				screenInfo[isTop].dstRect.x = indent;
+			}
+		}
+    } 
     
     screenSurface = SDL_SetVideoMode( screenWidth, screenHeight, 24, SDL_SWSURFACE | (fullScreenMode?SDL_FULLSCREEN:0));
     if (hideCursor) {
         SDL_ShowCursor(SDL_DISABLE);
     }
-    printf("screenSurface: %p\n", screenSurface);
+    logI("screenSurface: %p, pixels: %p\n", screenSurface, screenSurface->pixels);
     if (screenSurface == NULL) {
         printf("SDL_SetVideoMode failed.\n");
         return 1;
     }
 
-    topSurface = createScreenSurface(topRect.w, topRect.h + 20);
-
-    botSurface = createScreenSurface(botRect.w, botRect.h + 20);
+	for (int isTop = 0; isTop <= 1; isTop++){
+		screenInfo[isTop].surface = createScreenSurface(screenInfo[isTop].srcRect.w, screenInfo[isTop].srcRect.h + 20);
+	}
 
     mainLoop();
+	return 0;
 }
 
 int buildPacket(u32* buf, u32 type, u32 cmd, u32 arg0, u32 arg1, u32 arg2, u32 arg3) {
@@ -654,8 +668,7 @@ void activateStreaming(char* host) {
     int packetSize = buildPacket(buf, 0, 901,  (mode << 8) | priorityFactor, jpegQuality, qosInByte, 0);
     send(client_socket, (const char*) buf, packetSize, 0);
     doSleep(1);
-    for (int i = 0; i < 5; i++ ){
-        
+    for (int i = 0; i < 3; i++ ) {
         int packetSize = buildPacket(buf, 0, 0, 0, 0, 0, 0);
 		if (send(client_socket, (const char*)buf, packetSize, 0) < 0) {
             printf("send ping packet failed!\n");
@@ -668,13 +681,48 @@ void activateStreaming(char* host) {
 	closeSocket(client_socket);
 }
 
+int nameToSwsFlag(char* name) {
+#define CHECK_NAME(a,x,b) if(strcmp((a),name) == 0) {return (b);}
 
+	CHECK_NAME("fast_bilinear", "fast bilinear", SWS_FAST_BILINEAR );
+	CHECK_NAME("bilinear", "bilinear", SWS_BILINEAR );
+	CHECK_NAME("bicubic", "bicubic", SWS_BICUBIC );
+	CHECK_NAME("experimental", "experimental", SWS_X );
+	CHECK_NAME("neighbor", "nearest neighbor", SWS_POINT );
+	CHECK_NAME("area", "averaging area", SWS_AREA );
+	CHECK_NAME("bicublin", "luma bicubic, chroma bilinear", SWS_BICUBLIN );
+	CHECK_NAME("gauss", "Gaussian", SWS_GAUSS );
+	CHECK_NAME("sinc", "sinc", SWS_SINC );
+	CHECK_NAME("lanczos", "Lanczos", SWS_LANCZOS );
+	CHECK_NAME("spline", "natural bicubic spline", SWS_SPLINE );
+	return 0;
+
+}
 void parseOpts(int argc, char* argv[]) {
-    const char* optString = "l:t:b:Dd:fa:h";
+    const char* optString = "l:t:b:Dd:fa:cw:h:s:m:p:j:q:";
     int opt = getopt(argc, argv, optString);;
     while (opt != (int) (-1)) {
         
         switch (opt) {
+			case 's':
+			swsFlag = nameToSwsFlag(optarg);
+			if (swsFlag == 0) {
+				printf("Invalid scale algorithm name!\n");
+				exit(1);
+			}
+			break;
+			case 'm':
+				priorityMode = atoi(optarg);
+				break;
+			case 'p':
+				priorityFactor = atoi(optarg);
+				break;
+			case 'j':
+				jpegQuality = atoi(optarg);
+				break;
+			case 'q':
+				qosValue = (float)atof(optarg);
+				break;
             case 'l':
                 layoutMode = atoi(optarg);
                 break;
@@ -690,9 +738,15 @@ void parseOpts(int argc, char* argv[]) {
             case 'f':
                 fullScreenMode = 1;
                 break;
-            case 'h':
+            case 'c':s
                 hideCursor = 1;
                 break;
+			case 'w':
+				screenWidth = atoi(optarg);
+				break;
+			case 'h':
+				screenHeight = atoi(optarg);
+				break;
             case 'a':
                 strcpy(activateStreamingHost, optarg);
                 break;
@@ -714,6 +768,7 @@ int main(int argc, char* argv[]) {
         return 0;
     }
 #endif
+
     decompressHandle = tjInitDecompress();
     parseOpts(argc, argv);
     
