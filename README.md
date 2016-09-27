@@ -22,7 +22,9 @@ make CONF=OSX
 
 Linux:
 
-apt-get install libsdl1.2-dev libjpeg-turbo8-dev libswscale
+apt-get install libsdl1.2-dev libjpeg-turbo8-dev libswscale-dev
+
+(or other equivalent methods to get these libraries installed)
 
 make CONF=Release
 
