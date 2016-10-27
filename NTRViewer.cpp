@@ -19,10 +19,10 @@ extern "C" {
 #include <libavutil/pixfmt.h>
 }
 
-#ifdef AV_PIX_FMT_RGB32
-#define XXX_PIX_FMT_RGB24 (AV_PIX_FMT_RGB32)
+#ifdef AV_PIX_FMT_RGB24
+#define XXX_PIX_FMT_RGB24 (AV_PIX_FMT_RGB24)
 #else
-#define XXX_PIX_FMT_RGB24 (PIX_FMT_RGB32)
+#define XXX_PIX_FMT_RGB24 (PIX_FMT_RGB24)
 #endif 
 
 
