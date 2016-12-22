@@ -53,7 +53,7 @@ FFLAGS=
 ASFLAGS=
 
 # Link Libraries and Options
-LDLIBSOPTIONS=-lSDL -lswscale
+LDLIBSOPTIONS=-L/usr/local/opt/sdl/lib -lSDL -L/usr/local/opt/ffmpeg/lib -lswscale
 
 # Build Targets
 .build-conf: ${BUILD_SUBPROJECTS}
@@ -61,12 +61,12 @@ LDLIBSOPTIONS=-lSDL -lswscale
 
 ${CND_DISTDIR}/${CND_CONF}/${CND_PLATFORM}/ntrviewer: ${OBJECTFILES}
 	${MKDIR} -p ${CND_DISTDIR}/${CND_CONF}/${CND_PLATFORM}
-	${LINK.cc} -o ${CND_DISTDIR}/${CND_CONF}/${CND_PLATFORM}/ntrviewer ${OBJECTFILES} ${LDLIBSOPTIONS} /usr/local/opt/jpeg-turbo/lib/libturbojpeg.a
+	${LINK.cc} -o ${CND_DISTDIR}/${CND_CONF}/${CND_PLATFORM}/ntrviewer ${OBJECTFILES} ${LDLIBSOPTIONS} /usr/local/opt/jpeg-turbo/lib/libturbojpeg.a 
 
 ${OBJECTDIR}/NTRViewer.o: NTRViewer.cpp 
 	${MKDIR} -p ${OBJECTDIR}
 	${RM} "$@.d"
-	$(COMPILE.cc) -O2 -I/usr/local/opt/jpeg-turbo/include -MMD -MP -MF "$@.d" -o ${OBJECTDIR}/NTRViewer.o NTRViewer.cpp
+	$(COMPILE.cc) -O2 -I/usr/local/opt/jpeg-turbo/include -I/usr/local/opt/ffmpeg/include -I/usr/local/opt/sdl/include -MMD -MP -MF "$@.d" -o ${OBJECTDIR}/NTRViewer.o NTRViewer.cpp
 
 ${OBJECTDIR}/getopt.o: getopt.c 
 	${MKDIR} -p ${OBJECTDIR}
