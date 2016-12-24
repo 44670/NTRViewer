@@ -22,7 +22,11 @@ extern "C" {
 #ifdef AV_PIX_FMT_RGB24
 #define XXX_PIX_FMT_RGB24 (AV_PIX_FMT_RGB24)
 #else
-#define XXX_PIX_FMT_RGB24 (PIX_FMT_RGB24)
+    #ifdef __APPLE__
+        #define XXX_PIX_FMT_RGB24 (AV_PIX_FMT_RGB24)
+    #else
+        #define XXX_PIX_FMT_RGB24 (PIX_FMT_RGB24)
+    #endif
 #endif 
 
 
