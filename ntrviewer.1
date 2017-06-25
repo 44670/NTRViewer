@@ -1,0 +1,86 @@
+.Dd June 25, 2017
+.Dt NTRVIEWER 1
+.Sh NAME
+.Nm ntrviewer
+.Nd X client for NTR streaming
+.Sh SYNOPSIS
+.Nm
+.Op Fl Dfc
+.Op Fl s Ar algorithm
+.Op Fl m Ar mode
+.Op Fl p Ar factor
+.Op Fl j Ar quality
+.Op Fl q Ar qos
+.Op Fl l Ar mode
+.Op Fl t Ar scale
+.Op Fl b Ar scale
+.Op Fl w Ar width
+.Op Fl w Ar height
+.Fl a Ar address
+.Sh DESCRIPTION
+.Nm
+is a tool which allows one to stream video from their 3DS to their PC.
+.Sh OPTIONS
+.Bl -tag -width indent
+.It Fl s Ar algorithm
+Causes
+.Nm
+to use the algorithm
+.Ar algorithm
+when scaling screen images. Possible algorithms are:
+.Bl -tag -width Ar -offset indent -compact
+.It Cm fast_bilinear
+.It Cm bilinear
+.It Cm bicubic
+.It Cm experimental
+.It Cm neighbor
+Nearest neighbor algorithm
+.It Cm area
+Averaging area
+.It Cm bicublin
+Chroma bilinear
+.It Cm gauss
+Gaussian
+.It Cm sinc
+.It Cm lanczos
+.It Cm spline
+.El
+.It Fl m Ar mode
+Sets packets' priority mode to 0 if
+.Ar mode
+is zero, sets it to 1 otherwise
+.It Fl p Ar factor
+Sets packets' priority factor
+.It Fl j Ar quality
+Sets jpeg compression quality to
+.Ar quality .
+The default value is 80.
+.It Fl q Ar qos
+Sets packet qos.
+.It Fl l Ar mode
+Sets layout mode.
+In mode 0, the screens are laid out horizontally in the viewing window, and in mode 1, they are vertical (one on top of the other).
+.It Fl t Ar scale
+Sets the scale factor for the top screen image.
+.It Fl b Ar scale
+Sets the scale factor for the bottom screen image
+.It Fl D
+.Nm
+exits immediately when starting.
+.It Fl f
+Enables full-screen mode.
+.It Fl c
+Hides the cursor when it is over the viewing window.
+.It Fl w Ar width
+Sets the width of the viewing window.
+.It Fl h Ar height
+Sets the height of the viewing window.
+.It Fl a Ar address
+The IP address of the 3DS whose screen you wish to view.
+.Sh AUTHORS
+.An 44670 Aq www.github.com/44670
+.An InstaSauce Aq www.github.com/InstaSauce
+.br
+Manpage by
+.An -nosplit
+.An goose121 Aq goose121.github.io
